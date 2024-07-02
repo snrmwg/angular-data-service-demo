@@ -1,1 +1,25 @@
-/* You can add global styles to this file, and also import other style files */
+pre {
+  border: 1px solid darkgray;
+  height: 15rem;
+  overflow-y: scroll;
+}
+
+.button-panel {
+  display: flex;
+  gap: 1em;
+  padding: 0 0 1em;
+}
+.business-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5em;
+  padding: 0.5em;
+  background-color: lightgreen;
+}
+
+.business-item {
+  border: 1px solid darkgray;
+  padding: 1em;
+
+  flex-grow: 1;
+}
