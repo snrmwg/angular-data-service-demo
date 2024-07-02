@@ -3,33 +3,55 @@ import {
   Observable,
   Subscriber,
   Subscription,
+  auditTime,
+  finalize,
+  groupBy,
+  mergeMap,
+  throttleTime,
 } from 'rxjs';
 
 import { BusinessObject, NOTIF } from './domain';
 import { LoggerService } from './logger.service';
+import { DATA_API_TOKEN, DataApi } from './data-api';
 
 @Injectable()
 export class DataService {
   private businessSubscribers = new Map<string, Set<Subscriber<BusinessObject>>>();
-
   private subscriptions = new Map<string, Subscription>();
 
   constructor(
-    // private http: HttpClient,
+    @Inject(DATA_API_TOKEN) dataApi: DataApi,
     @Inject(NOTIF) notifications$: Observable<string>,
     private logger: LoggerService
   ) {
-    notifications$.subscribe((key) => {
+    notifications$.pipe(
+      groupBy((key) => key),
+      mergeMap(group => group.pipe(
+        // throttleTime(5_000)
+        auditTime(5_000)
+      ))
+    ).subscribe((key) => {
       const sub = this.businessSubscribers.has(key);
-      logger.log(`DataService received notif ${key} ${sub}`);
+      const isFetching = this.subscriptions.has(key);
+      logger.log(`data-service received notif ${key} subscribers? ${sub} isFetching? ${isFetching}`);
       if (sub) {
-        if (this.subscriptions.has(key)) {
-          this.subscriptions.get(key)!.unsubscribe();
+        if (isFetching) {
+          // um laufendes Laden abzubrechen:
+          // this.subscriptions.get(key)!.unsubscribe();
+
+          // oder einfach diese Notification ignorieren und zu Ende laden lassen
+          return;
         }
 
-        const newSub = this.fetchBusinessObject(key).subscribe(bo => this.notifySubscribers(key, bo));
+        const newSub = dataApi.fetchBusinessObject$(key)
+          .pipe(
+            finalize(() => this.subscriptions.delete(key))
+          )
+          .subscribe(bo => this.notifySubscribers(key, bo));
         this.subscriptions.set(key, newSub);
       }
+      // TODO else unknownBusinessKeys$.next(key);
+      //   kann von UI genutzt werden, um neue Compontent fuer jeweiligen Key zu erstellen
     });
   }
 
@@ -78,37 +100,5 @@ export class DataService {
         subscriber.next(businessObject);
       });
     }
-  }
-
-  private fetchBusinessObject(key: string): Observable<BusinessObject> {
-    // return this.http.get<BusinessObject>(`/api/business-objects/${key}`)
-    //   .pipe(
-    //     catchError(() => of(null)) // Handle errors gracefully (optional)
-    //   );
-
-    return new Observable<BusinessObject>((observer) => {
-      // 3-8s Ladezeit simulieren
-      const randomDelay = Math.floor(Math.random() * (8000 - 3000 + 1)) + 3000;
-      this.logger.log(`Lade key ${key} Start (${randomDelay}ms Delay)`);
-
-      let completed = false;
-      const timeout = setTimeout(() => {
-        observer.next({
-          key,
-          content: `schalala fuer key: ${key}`,
-        });
-        completed = true;
-        observer.complete();
-      }, randomDelay);
-
-      return () => {
-        clearTimeout(timeout);
-        if (completed) {
-          this.logger.log(`Laden key ${key} completed`);
-        } else {
-          this.logger.log(`Laden key ${key} ABGEBROCHEN`);
-        }
-      };
-    });
   }
 }

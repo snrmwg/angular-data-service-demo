@@ -5,12 +5,10 @@
 </div>
 
 <div class="business-panel">
-  <div class="business-item">
-    k1 <input type="checkbox" [ngModel]="isAktiv('k1')" (ngModelChange)="changed('k1')" />aktiv
-  </div>
-  <div class="business-item">k2 <input type="checkbox" [ngModel]="isAktiv('k2')" (ngModelChange)="changed('k2')" />aktiv</div>
-  <div class="business-item">k3</div>
+  <app-business-item business-key="k1" />
+  <app-business-item business-key="k2" />
+  <app-business-item business-key="k3" />
 </div>
 
 <pre>{{logger.log$ | async}}</pre>
-<button (click)="logger.clear()">clear</button>
+<button (click)="logger.clear()">leeren</button>
